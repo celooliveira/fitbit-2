@@ -10,34 +10,43 @@ import datetime
 from pyquery import PyQuery as pq
 import requests
 
-WEEKLY_MILES = 50
+WEEKLY_MILES = 50 # TODO get from page source
+DISTANCE_TO_PORTLAND = 674
 
-data = {
-	'email': private.EMAIL,
-	'password': private.PASSWORD,
-	'login': 'Log In',
-	'includeWorkflow': 'false',
-	'_sourcePage': 'JyTixiAQ0UPGrJMFkFsv6XbX0f6OV1Ndj1zeGcz7OKzA3gkNXMXGnj27D-H9WXS-',
-	'__fp': 'wjVh739tJHNztQ7FkK21Ry2MI7JbqWTf',
-	'rememberMe': 'true',
-}
 
-r = requests.post('https://www.fitbit.com/login', data=data)
-content = pq(r.content)
-percentage = int(content("#goalScene .details span").text().split('\r')[0])
+def get_fitbit_homepage():
+	"""Returns a PyQuery object representing your logged-in fitbit.com homepage."""
+	data = {
+		'email': private.EMAIL,
+		'password': private.PASSWORD,
+		'login': 'Log In',
+		'includeWorkflow': 'false',
+		'_sourcePage': 'JyTixiAQ0UPGrJMFkFsv6XbX0f6OV1Ndj1zeGcz7OKzA3gkNXMXGnj27D-H9WXS-',
+		'__fp': 'wjVh739tJHNztQ7FkK21Ry2MI7JbqWTf',
+		'rememberMe': 'true',
+	}
 
-today = datetime.date.today()
+	r = requests.post('https://www.fitbit.com/login', data=data)
+	return pq(r.content)
 
-so_far = percentage / 100.0 * WEEKLY_MILES
-remaining = WEEKLY_MILES - so_far
+def main():
+	fitbit_homepage = get_fitbit_homepage()
 
-print 'at %s%% of your weekly goal of %s miles' % (percentage, WEEKLY_MILES)
-print '%s miles walked this week' % so_far
-print '%s miles left to go' % remaining
-print '%s miles per day average so far this week' % (so_far / today.weekday())
-print '%s miles per day average for the rest of the days in this week required to meet your goal' % (remaining / (7 - today.weekday()))
+	env = {}
+	goal_words = fitbit_homepage("#goalScene .details p").text().split() # "['72', '%', 'of', '50.0', 'weekly', 'miles']"
+	env['percentage_of_weekly_goal'] = float(goal_words[0])
+	env['weekly_goal_in_miles'] = float(goal_words[3])
+	env['miles_walked'] = env['percentage_of_weekly_goal'] / 100.0 * env['weekly_goal_in_miles']
+	env['miles_remaining'] = env['weekly_goal_in_miles'] - env['miles_walked']
 
-now = datetime.datetime.now()
-seconds_elapsed_this_week = now.second + (60 * now.minute) + (60 * 60 * now.hour) + (60 * 60 * 24 * now.weekday())
-percentage_of_week_elapsed = seconds_elapsed_this_week / (7 * 24 * 60 * 60.0) * 100
-print percentage_of_week_elapsed
+	today = datetime.date.today()
+	env['daily_average_so_far'] = env['miles_walked'] / today.weekday()
+	env['daily_average_required_for_rest_of_week'] = env['miles_remaining'] / (7 - today.weekday())
+
+	from pprint import pprint
+	pprint(env)
+
+
+
+if __name__ == "__main__":
+	main()
