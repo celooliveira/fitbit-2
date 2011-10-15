@@ -29,6 +29,11 @@ def get_fitbit_homepage(session):
 	r = session.post('https://www.fitbit.com/login', data=data)
 	return pq(r.content)
 
+def previous_days_homepage(homepage, session):
+	"""Returns a PyQuery object representing your fitbit dashboard on the day before the day that the passed-in homepage represents."""
+	yesterday_url = homepage("#dateNavHeader li a")[0].attrib['href']
+	return pq(session.get('http://www.fitbit.com%s' % yesterday_url).content)
+
 def badges_so_far_this_week(homepage, session):
 	"""Returns a dict of {badge_name: count} like {'15k': 2, '20k': 1, '10k': 4, '5k': 6}.
 
@@ -47,11 +52,18 @@ def badges_so_far_this_week(homepage, session):
 			for badge in possible_badges_in_order[:possible_badges_in_order.index(best_badge_earned)+1]:
 				badge_counts[badge] += 1
 
-		# now go back in time a day
-		yesterday_url = homepage("#dateNavHeader li a")[0].attrib['href']
-		homepage = pq(session.get('http://www.fitbit.com%s' % yesterday_url).content)
+		homepage = previous_days_homepage(homepage, session)
 
 	return badge_counts
+
+def weekday_distances(homepage, session):
+	"""Returns a list of [miles_walked_on_monday, miles_walked_on_tuesday, ...]"""
+	distances = []
+	for i in range(datetime.date.today().weekday() + 1):
+		distances.append(float(homepage(".distance_traveled span.highlight1")[0].text.strip()))
+		homepage = previous_days_homepage(homepage, session)
+
+	return list(reversed(distances))
 
 def main():
 	env = {}
@@ -59,16 +71,24 @@ def main():
 	with requests.session() as session:
 		homepage = get_fitbit_homepage(session)
 		env['badges_this_week'] = badges_so_far_this_week(homepage, session)
+		env['weekday_distances'] = weekday_distances(homepage, session)
 
-	goal_words = homepage("#goalScene .details p").text().split() # "['72', '%', 'of', '50.0', 'weekly', 'miles']"
+	goal_words = homepage("#goalScene .details p").text().split() # looks like "['72', '%', 'of', '50.0', 'weekly', 'miles']"
 	env['percentage_of_weekly_goal'] = float(goal_words[0])
 	env['weekly_goal_in_miles'] = float(goal_words[3])
-	env['miles_walked'] = env['percentage_of_weekly_goal'] / 100.0 * env['weekly_goal_in_miles']
+
+	env['miles_walked'] = sum(env['weekday_distances'])
 	env['miles_remaining'] = env['weekly_goal_in_miles'] - env['miles_walked']
+
 
 	today = datetime.date.today()
 	env['daily_average_so_far'] = env['miles_walked'] / today.weekday()
 	env['daily_average_required_for_rest_of_week'] = env['miles_remaining'] / (7 - today.weekday())
+
+	env['best_weekday'] = today - datetime.timedelta(days=today.weekday() - env['weekday_distances'].index(max(env['weekday_distances'])))
+
+	env['lifetime_distance'] = float(homepage(".lifetime .distance span.value")[0].text)
+	env['num_times_walked_to_portland'] = env['lifetime_distance'] / DISTANCE_TO_PORTLAND
 
 	from pprint import pprint
 	pprint(env)
