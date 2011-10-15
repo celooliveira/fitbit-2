@@ -8,11 +8,25 @@ except ImportError:
 from collections import defaultdict
 import datetime
 
+from mako.template import Template
 from pyquery import PyQuery as pq
 import requests
 
 
 DISTANCE_TO_PORTLAND = 674
+
+class VerboseSession(object):
+	def __init__(self, session):
+		self.session = session
+
+	def get(self, url, *args, **kwargs):
+		print "GET: %s" % (url,)
+		return self.session.get(url, *args, **kwargs)
+
+	def post(self, url, *args, **kwargs):
+		print "POST: %s" % (url,)
+		return self.session.post(url, *args, **kwargs)
+
 
 def get_fitbit_homepage(session):
 	"""Returns a PyQuery object representing your logged-in fitbit.com homepage."""
@@ -69,6 +83,7 @@ def main():
 	env = {}
 
 	with requests.session() as session:
+		session = VerboseSession(session)
 		homepage = get_fitbit_homepage(session)
 		env['badges_this_week'] = badges_so_far_this_week(homepage, session)
 		env['weekday_distances'] = weekday_distances(homepage, session)
@@ -85,13 +100,16 @@ def main():
 	env['daily_average_so_far'] = env['miles_walked'] / today.weekday()
 	env['daily_average_required_for_rest_of_week'] = env['miles_remaining'] / (7 - today.weekday())
 
-	env['best_weekday'] = today - datetime.timedelta(days=today.weekday() - env['weekday_distances'].index(max(env['weekday_distances'])))
+	env['best_distance'] = max(env['weekday_distances'])
+	env['best_weekday'] = today - datetime.timedelta(days=today.weekday() - env['weekday_distances'].index(env['best_distance']))
 
 	env['lifetime_distance'] = float(homepage(".lifetime .distance span.value")[0].text)
 	env['num_times_walked_to_portland'] = env['lifetime_distance'] / DISTANCE_TO_PORTLAND
 
-	from pprint import pprint
-	pprint(env)
+
+	html = Template(filename="index.tmpl").render(**env)
+	with open('index.html', 'w') as f:
+		f.writelines(html)
 
 
 
