@@ -7,6 +7,7 @@ except ImportError:
 
 from collections import defaultdict
 import datetime
+import json
 
 from mako.template import Template
 from pyquery import PyQuery as pq
@@ -68,7 +69,7 @@ def badges_so_far_this_week(homepage, session):
 
 		homepage = previous_days_homepage(homepage, session)
 
-	return badge_counts
+	return sorted([(badge, count) for badge, count in badge_counts.iteritems()], key=lambda (badge, _): possible_badges_in_order.index(badge), reverse=True)
 
 def weekday_distances(homepage, session):
 	"""Returns a list of [miles_walked_on_monday, miles_walked_on_tuesday, ...]"""
@@ -86,13 +87,15 @@ def main():
 		session = VerboseSession(session)
 		homepage = get_fitbit_homepage(session)
 		env['badges_this_week'] = badges_so_far_this_week(homepage, session)
-		env['weekday_distances'] = weekday_distances(homepage, session)
+
+		distances = weekday_distances(homepage, session)
+		env['weekday_distances'] = json.dumps([(str(weekday), distance) for weekday, distance in enumerate(distances)])
 
 	goal_words = homepage("#goalScene .details p").text().split() # looks like "['72', '%', 'of', '50.0', 'weekly', 'miles']"
-	env['percentage_of_weekly_goal'] = float(goal_words[0])
+	env['percentage_of_weekly_goal'] = int(goal_words[0])
 	env['weekly_goal_in_miles'] = float(goal_words[3])
 
-	env['miles_walked'] = sum(env['weekday_distances'])
+	env['miles_walked'] = sum(distances)
 	env['miles_remaining'] = env['weekly_goal_in_miles'] - env['miles_walked']
 
 
@@ -100,18 +103,21 @@ def main():
 	env['daily_average_so_far'] = env['miles_walked'] / today.weekday()
 	env['daily_average_required_for_rest_of_week'] = env['miles_remaining'] / (7 - today.weekday())
 
-	env['best_distance'] = max(env['weekday_distances'])
-	env['best_weekday'] = today - datetime.timedelta(days=today.weekday() - env['weekday_distances'].index(env['best_distance']))
+	env['best_distance'] = max(distances)
+	env['best_weekday'] = (today - datetime.timedelta(days=today.weekday() - distances.index(env['best_distance']))).strftime('%A')
 
 	env['lifetime_distance'] = float(homepage(".lifetime .distance span.value")[0].text)
 	env['num_times_walked_to_portland'] = env['lifetime_distance'] / DISTANCE_TO_PORTLAND
 
+	for k in env:
+		if isinstance(env[k], float):
+			env[k] = '%.2f' % (env[k],)
 
 	html = Template(filename="index.tmpl").render(**env)
 	with open('index.html', 'w') as f:
 		f.writelines(html)
 
 
-
 if __name__ == "__main__":
 	main()
+

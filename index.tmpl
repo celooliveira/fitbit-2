@@ -2,18 +2,81 @@
 <html>
 <head>
 	<title>hi</title>
+	<link rel="stylesheet" href="style.css" />
 </head>
 <body>
-	<ul id="everything">
-		<li id="portland">you've walked the distance between here and portland <strong>${num_times_walked_to_portland}</strong> times</li>
-		<li id="percentage">currently at <strong>${percentage_of_weekly_goal}%</strong> of your weekly goal</li>
-		<li id="badges">badges earned this week: ${badges_this_week}</li>
-		<li id="miles_walked"><strong>${miles_walked}</strong> miles walked this week</li>
-		<li id="miles_remaining"><strong>${miles_remaining}</strong> miles left this week</li>
-		<li id="weekday_distances"><strong>${weekday_distances}</strong> distances this week</li>
-		<li id="daily_average"><strong>${daily_average_so_far}</strong> miles per day average so far this week</li>
-		<li id="daily_average_required"><strong>${daily_average_required_for_rest_of_week}</strong> miles per day average required for remaining days in week</li>
-		<li id="best_weekday"><strong>${best_weekday}</strong> was your best day so far this week - you walked <strong>${best_distance}</strong> miles</li>
-	</ul>
+	<table><!-- hell yes bitches -->
+		<tbody>
+			<tr>
+				<td id="portland">you've walked the distance between here and portland <strong>${num_times_walked_to_portland}</strong> times</td>
+				<td id="percentage">currently at <strong>${percentage_of_weekly_goal}%</strong> of your weekly goal</td>
+				<td id="badges">
+					badges earned this week:
+					<ul>
+						% for (badge, count) in badges_this_week:
+							<li>
+								<img src="http://www.fitbit.com/images/dash/badge_daily_steps${badge}.png" /><span>${count}</span>
+							</li>
+						% endfor
+					</ul>
+				</td>
+			</tr>
+			<tr>
+				<td id="miles_walked"><strong>${miles_walked}</strong> miles walked this week</td>
+				<td id="miles_remaining">
+					% if float(miles_remaining) > 0:
+						<strong>${miles_remaining}</strong> miles left this week
+					% else:
+						<strong>you're done</strong>
+					% endif
+				</td>
+				<td id="weekday_distances"></td>
+			</tr>
+			<tr>
+				<td id="daily_average"><strong>${daily_average_so_far}</strong> miles per day average so far this week</td>
+				<td id="daily_average_required">
+					% if float(daily_average_required_for_rest_of_week) > 0:
+						<strong>${daily_average_required_for_rest_of_week}</strong> miles per day average required for remaining days in week
+					% else:
+						<strong>stop walking, dude</strong>
+					% endif
+				</td>
+				<td id="best_weekday"><strong>${best_weekday}</strong> was your best day so far this week - you walked <strong>${best_distance} miles</strong></td>
+			</tr>
+		</tbody>
+	</table>
+	<script src="jquery-1.6.4.min.js"></script>
+	<script type="text/javascript" src="https://www.google.com/jsapi"></script>
+	<script type="text/javascript">
+		google.load('visualization', '1.0', {'packages':['corechart']});
+		google.setOnLoadCallback(function() {
+			var data = new google.visualization.DataTable();
+			data.addColumn('string', 'weekday');
+			data.addColumn('number', 'miles');
+			data.addRows(${weekday_distances});
+
+			var options = {
+				'legend': 'none',
+				'axisTitlesPosition': 'none',
+				'width': window.innerWidth / 4,
+				'height': window.innerHeight / 3.2,
+				'colors': ['black'],
+				'title': 'miles walked',
+				'hAxis': {
+					'textPosition': 'none'
+				},
+				'vAxis': {
+					'minValue': 0
+				}
+			};
+
+			var chart = new google.visualization.AreaChart(document.getElementById('weekday_distances'));
+			chart.draw(data, options);
+		});
+
+		$(function() {
+			$("#badges ul").width($("#badges ul li").length * 60);
+		});
+	</script>
 </body>
 </html>
