@@ -36,8 +36,6 @@ def get_fitbit_homepage(session):
 		'password': private.PASSWORD,
 		'login': 'Log In',
 		'includeWorkflow': 'false',
-		'_sourcePage': 'JyTixiAQ0UPGrJMFkFsv6XbX0f6OV1Ndj1zeGcz7OKzA3gkNXMXGnj27D-H9WXS-',
-		'__fp': 'wjVh739tJHNztQ7FkK21Ry2MI7JbqWTf',
 		'rememberMe': 'true',
 	}
 
@@ -100,8 +98,8 @@ def main():
 
 
 	today = datetime.date.today()
-	env['daily_average_so_far'] = env['miles_walked'] / today.weekday()
-	env['daily_average_required_for_rest_of_week'] = env['miles_remaining'] / (7 - today.weekday())
+	env['daily_average_so_far'] = sum(distances[:-1]) / (today.weekday()) if today.weekday() else 0
+	env['daily_average_required_for_rest_of_week'] = (env['weekly_goal_in_miles'] - sum(distances[:-1])) / (7 - today.weekday())
 
 	env['best_distance'] = max(distances)
 	env['best_weekday'] = (today - datetime.timedelta(days=today.weekday() - distances.index(env['best_distance']))).strftime('%A')
